@@ -1,0 +1,392 @@
+{
+  "info": {
+    "name": "VerifyProceed — Decision + Verification API",
+    "description": "Verification infrastructure for AI agents. Verify autonomous actions before execution through policy enforcement, risk validation, and execution verification.\n\n## Base URLs\n\n| Variable | Value | Used for |\n|---|---|---|\n| `{{publicBaseUrl}}` | https://decision-verification-agent.onrender.com | Public endpoints — no auth |\n| `{{privateBaseUrl}}` | https://dupfyqqbvkrmzjexwukd.supabase.co | Key-authenticated endpoints |\n\n## Authentication\n\n- `Authorization: Bearer {{apiKey}}` — recommended\n- `X-API-Key: {{apiKey}}` — alternative\n- `x402-Payment: {{paymentProof}}` — keyless, $0.01 USDC on Base\n\n## Get a free API key\n\nhttps://verifyproceed.com/get-api-key — 100 requests/month, no credit card\n\nDocs: https://verifyproceed.com/docs",
+    "_postman_id": "verifyproceed-v1-2026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "publicBaseUrl",
+      "value": "https://decision-verification-agent.onrender.com",
+      "type": "string",
+      "description": "Render — public compute endpoints (health, capabilities, agents, acp/guard, acp/decide)"
+    },
+    {
+      "key": "privateBaseUrl",
+      "value": "https://dupfyqqbvkrmzjexwukd.supabase.co",
+      "type": "string",
+      "description": "Supabase — key-authenticated endpoints (api-key-signup, guard)"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string",
+      "description": "Your vp_ API key. Get one free at https://verifyproceed.com/get-api-key"
+    },
+    {
+      "key": "paymentProof",
+      "value": "",
+      "type": "string",
+      "description": "Base64-encoded x402 USDC payment proof on Base (keyless flow)"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Liveness check. Public — no authentication required.\n\nHost: {{publicBaseUrl}}",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{publicBaseUrl}}/health",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns API health status. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"name\": \"Decision + Verification Agent\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{publicBaseUrl}}/health", "host": ["{{publicBaseUrl}}"], "path": ["health"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Discovery",
+      "description": "Capability and agent discovery. Public — no authentication required.\n\nHost: {{publicBaseUrl}}",
+      "item": [
+        {
+          "name": "GET /v1/capabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/capabilities",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "capabilities"]
+            },
+            "description": "Returns the full capability manifest describing available checks, agents, and supported operations."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/agents",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "agents"]
+            },
+            "description": "Returns a list of all available agents and their supported actions."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "API key self-provisioning. Free tier: 100 requests/month.\n\nHost: {{privateBaseUrl}} (Supabase)\n\nKeys are stored in the shared api_signups table and are immediately valid on POST /functions/v1/guard.",
+      "item": [
+        {
+          "name": "POST /functions/v1/api-key-signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\":   \"Ada Lovelace\",\n  \"email\":       \"ada@example.com\",\n  \"company\":     \"Acme Labs\",\n  \"use_case\":    \"defi-agent\",\n  \"description\": \"Autonomous DeFi trading agent on Base\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{privateBaseUrl}}/functions/v1/api-key-signup",
+              "host": ["{{privateBaseUrl}}"],
+              "path": ["functions", "v1", "api-key-signup"]
+            },
+            "description": "Issue a new `vp_` API key. Free tier — 100 requests/month, no credit card required.\n\nIf the email already has a key the existing key is returned with `is_existing: true`.\n\nRequired fields:\n- full_name (string)\n- email (string)\n- use_case (string)\n\nOptional fields:\n- company (string)\n- description (string)"
+          },
+          "response": [
+            {
+              "name": "200 OK — Key issued",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\":            true,\n  \"api_key\":       \"vp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  \"plan\":          \"free\",\n  \"monthly_limit\": 100,\n  \"is_existing\":   false,\n  \"message\":       \"API key created successfully.\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{privateBaseUrl}}/functions/v1/api-key-signup", "host": ["{{privateBaseUrl}}"], "path": ["functions", "v1", "api-key-signup"] }
+              }
+            },
+            {
+              "name": "200 OK — Existing key returned",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\":            true,\n  \"api_key\":       \"vp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  \"plan\":          \"free\",\n  \"monthly_limit\": 100,\n  \"is_existing\":   true,\n  \"message\":       \"An API key already exists for this email.\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{privateBaseUrl}}/functions/v1/api-key-signup", "host": ["{{privateBaseUrl}}"], "path": ["functions", "v1", "api-key-signup"] }
+              }
+            },
+            {
+              "name": "400 Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\":   \"bad_request\",\n  \"message\": \"full_name, email, and use_case are required.\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{privateBaseUrl}}/functions/v1/api-key-signup", "host": ["{{privateBaseUrl}}"], "path": ["functions", "v1", "api-key-signup"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guard (ACP · Render)",
+      "description": "Pre-execution safety verification via the Agent Communication Protocol.\n\nHost: {{publicBaseUrl}} (Render)\n\nAccepts: Bearer token, X-API-Key, or x402 $0.01 USDC on Base.",
+      "item": [
+        {
+          "name": "POST /v1/acp/guard — bridge (Bearer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\":     \"bridge\",\n  \"chain\":      \"base\",\n  \"amount_usd\": 50000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/acp/guard",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "acp", "guard"]
+            },
+            "description": "Verify that conditions are safe before executing a bridge operation.\n\nRequest fields:\n- action (required): \"bridge\" | \"swap\" | \"transfer\" | \"yield_deposit\" | \"stake\" | \"generic\"\n- chain (required): \"base\" | \"ethereum\" | \"arbitrum\" | \"optimism\"\n- amount_usd (optional): USD value\n- asset (optional): Asset symbol\n- strict_mode (optional): Treat warnings as blocks\n\nVerdict:\n- \"proceed\" → safe to execute\n- \"block\"   → do NOT execute\n- \"warn\"    → elevated risk — review"
+          },
+          "response": [
+            {
+              "name": "200 proceed",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"verdict\":    \"proceed\",\n  \"confidence\": 0.95,\n  \"risk\":       \"low\",\n  \"expires_in\": 300,\n  \"decision\": {\n    \"action\":      \"execute_bridge\",\n    \"reason\":      \"All safety checks passed.\",\n    \"constraints\": {}\n  },\n  \"evidence\":      [],\n  \"failure_modes\": []\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{publicBaseUrl}}/v1/acp/guard", "host": ["{{publicBaseUrl}}"], "path": ["v1", "acp", "guard"] }
+              }
+            },
+            {
+              "name": "401 Invalid API key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"invalid_api_key\" }",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{publicBaseUrl}}/v1/acp/guard", "host": ["{{publicBaseUrl}}"], "path": ["v1", "acp", "guard"] }
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/acp/guard — swap (X-API-Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{apiKey}}", "description": "Alternative to Authorization: Bearer" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\":     \"swap\",\n  \"chain\":      \"base\",\n  \"asset\":      \"USDC\",\n  \"amount_usd\": 10000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/acp/guard",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "acp", "guard"]
+            },
+            "description": "Same as the Bearer example but using the X-API-Key header instead."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/acp/guard — x402 keyless",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x402-Payment", "value": "{{paymentProof}}", "description": "Base64-encoded USDC payment proof on Base" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\":     \"bridge\",\n  \"chain\":      \"base\",\n  \"amount_usd\": 50000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/acp/guard",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "acp", "guard"]
+            },
+            "description": "Keyless flow — no API key required. Pay $0.01 USDC on Base.\n\n1. Send this request without credentials → receive HTTP 402\n2. Pay $0.01 USDC on Base to the address in the 402 body\n3. Encode payment proof as base64 → set as `x402-Payment` header\n4. Retry → receive 200 with verdict"
+          },
+          "response": [
+            {
+              "name": "402 Payment Required (step 1)",
+              "status": "Payment Required",
+              "code": 402,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\":   \"payment_required\",\n  \"code\":     402,\n  \"price\":    \"0.01\",\n  \"currency\": \"USDC\",\n  \"network\":  \"base\",\n  \"pay_to\":   \"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913\",\n  \"note\":     \"Pay $0.01 USDC on Base and retry with x402-Payment header\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{publicBaseUrl}}/v1/acp/guard", "host": ["{{publicBaseUrl}}"], "path": ["v1", "acp", "guard"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Decide (ACP · Render)",
+      "description": "Policy-driven decision engine via the Agent Communication Protocol.\n\nHost: {{publicBaseUrl}} (Render)\n\nCost: $0.01 USDC via x402 or Bearer / X-API-Key.",
+      "item": [
+        {
+          "name": "POST /v1/acp/decide — conservative swap (Bearer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"swap\",\n  \"goal\":   \"maximize yield on idle USDC\",\n  \"asset\":  \"USDC\",\n  \"chain\":  \"base\",\n  \"policy\": \"conservative\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{publicBaseUrl}}/v1/acp/decide",
+              "host": ["{{publicBaseUrl}}"],
+              "path": ["v1", "acp", "decide"]
+            },
+            "description": "Run a full policy-driven reasoning chain.\n\nRequest fields:\n- action (required): Agent action type\n- goal (optional): Objective in plain language\n- asset (optional): Asset symbol\n- chain (optional): Target chain\n- amount (optional): Amount in smallest unit\n- policy (optional): \"conservative\" | \"balanced\" | \"aggressive\"\n\nVerdict:\n- \"proceed\" → execute\n- \"block\"   → halt\n- \"wait\"    → defer"
+          },
+          "response": [
+            {
+              "name": "401 Invalid API key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"invalid_api_key\" }",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{publicBaseUrl}}/v1/acp/decide", "host": ["{{publicBaseUrl}}"], "path": ["v1", "acp", "decide"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guard (Private · Supabase)",
+      "description": "Key-authenticated guard endpoint. Validates against the shared api_signups key store — keys from /functions/v1/api-key-signup work immediately.\n\nHost: {{privateBaseUrl}} (Supabase)\n\nAccepts: Authorization: Bearer vp_xxx  OR  X-API-Key: vp_xxx\nCost: $0.01 deducted from monthly quota.",
+      "item": [
+        {
+          "name": "POST /functions/v1/guard — bridge (Bearer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\":     \"bridge\",\n  \"chain\":      \"base\",\n  \"amount_usd\": 50000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{privateBaseUrl}}/functions/v1/guard",
+              "host": ["{{privateBaseUrl}}"],
+              "path": ["functions", "v1", "guard"]
+            },
+            "description": "Pre-execution safety check authenticated with a vp_ API key.\n\nThe key is validated against api_signups (same store as /functions/v1/api-key-signup). After validation, the request is forwarded to the Render compute tier — no separate key registration required.\n\nRequires: Authorization: Bearer vp_xxx"
+          },
+          "response": [
+            {
+              "name": "200 proceed",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"verdict\":    \"proceed\",\n  \"confidence\": 0.95,\n  \"risk\":       \"low\",\n  \"expires_in\": 300,\n  \"decision\": {\n    \"action\":      \"execute_bridge\",\n    \"reason\":      \"All safety checks passed.\",\n    \"constraints\": {}\n  },\n  \"evidence\": [\n    { \"type\": \"rpc\",              \"status\": 200, \"latency_ms\": 28,  \"ok\": true },\n    { \"type\": \"stablecoin_depeg\", \"asset_id\": \"usd-coin\", \"price\": 0.999762, \"deviation_pct\": 0.000238, \"severity\": \"safe\", \"ok\": true }\n  ],\n  \"failure_modes\": []\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{privateBaseUrl}}/functions/v1/guard", "host": ["{{privateBaseUrl}}"], "path": ["functions", "v1", "guard"] }
+              }
+            },
+            {
+              "name": "401 Invalid API key",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"invalid_api_key\" }",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{privateBaseUrl}}/functions/v1/guard", "host": ["{{privateBaseUrl}}"], "path": ["functions", "v1", "guard"] }
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /functions/v1/guard — swap (X-API-Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{apiKey}}", "description": "Alternative to Authorization: Bearer" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\":     \"swap\",\n  \"chain\":      \"base\",\n  \"asset\":      \"USDC\",\n  \"amount_usd\": 10000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{privateBaseUrl}}/functions/v1/guard",
+              "host": ["{{privateBaseUrl}}"],
+              "path": ["functions", "v1", "guard"]
+            },
+            "description": "Same as Bearer example but using X-API-Key header instead."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

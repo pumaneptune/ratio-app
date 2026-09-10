@@ -1,0 +1,544 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VerifyProceed — Decision + Verification API",
+    "description": "Verification infrastructure for AI agents. Verify autonomous actions before execution through policy enforcement, risk validation and execution verification. Supports x402 machine-native USDC payments on Base mainnet.\n\n## Architecture\n\n| Endpoint | Host | Auth |\n|---|---|---|\n| `/health`, `/v1/capabilities`, `/v1/agents` | Render | None |\n| `/v1/acp/guard`, `/v1/acp/decide` | Render | Bearer / X-API-Key / x402 |\n| `/functions/v1/api-key-signup` | Supabase | None |\n| `/functions/v1/guard` | Supabase | Bearer / X-API-Key |\n\nKeys issued by `/functions/v1/api-key-signup` are stored in the shared `api_signups` key store and are immediately valid on `/functions/v1/guard`.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "VerifyProceed",
+      "url": "https://verifyproceed.com",
+      "email": "info@eglinlabs.com"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://verifyproceed.com/terms"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://decision-verification-agent.onrender.com",
+      "description": "Render — public compute"
+    },
+    {
+      "url": "https://dupfyqqbvkrmzjexwukd.supabase.co",
+      "description": "Supabase — key-authenticated endpoints"
+    }
+  ],
+  "security": [],
+  "tags": [
+    { "name": "Health",    "description": "Liveness and readiness checks" },
+    { "name": "Discovery", "description": "Capability and agent discovery" },
+    { "name": "Auth",      "description": "API key self-provisioning (Supabase)" },
+    { "name": "Guard",     "description": "Pre-execution safety verification (ACP · Render)" },
+    { "name": "Decide",    "description": "Policy-driven decision engine (ACP · Render)" },
+    { "name": "Private",   "description": "Key-authenticated guard endpoint (Supabase)" }
+  ],
+  "paths": {
+    "/health": {
+      "servers": [{ "url": "https://decision-verification-agent.onrender.com" }],
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness check",
+        "description": "Returns API health status. Public — no authentication required.",
+        "operationId": "getHealth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API operational",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": { "ok": true, "name": "Decision + Verification Agent" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/capabilities": {
+      "servers": [{ "url": "https://decision-verification-agent.onrender.com" }],
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "Capability manifest",
+        "description": "Returns the full capability manifest describing available checks, agents, and supported operations. Public — no authentication required.",
+        "operationId": "getCapabilities",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Capability manifest",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CapabilitiesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents": {
+      "servers": [{ "url": "https://decision-verification-agent.onrender.com" }],
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "List agents",
+        "description": "Returns a list of all available agents and their supported actions. Public — no authentication required.",
+        "operationId": "listAgents",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "List of agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Agent" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/acp/guard": {
+      "servers": [{ "url": "https://decision-verification-agent.onrender.com" }],
+      "post": {
+        "tags": ["Guard"],
+        "summary": "ACP pre-execution safety check",
+        "description": "Verify that conditions are safe before executing an on-chain action. Accepts Bearer token (API key) or X-API-Key header, or x402 USDC micropayment ($0.01 USDC on Base). Returns a deterministic verdict: proceed, block, or warn. Verdict expires in `expires_in` seconds — re-verify before acting if the agent stalls.",
+        "operationId": "acpGuard",
+        "security": [
+          { "bearerAuth": [] },
+          { "apiKeyHeader": [] },
+          { "x402Payment": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GuardRequest" },
+              "example": {
+                "action": "bridge",
+                "chain": "base",
+                "amount_usd": 50000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guard verdict issued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GuardResponse" },
+                "example": {
+                  "verdict": "proceed",
+                  "confidence": 0.95,
+                  "risk": "low",
+                  "expires_in": 300,
+                  "decision": {
+                    "action": "execute_bridge",
+                    "reason": "All safety checks passed.",
+                    "constraints": {}
+                  },
+                  "evidence": [],
+                  "failure_modes": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "invalid_api_key" }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — x402 challenge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaymentRequired" },
+                "example": {
+                  "status": "payment_required",
+                  "code": 402,
+                  "price": "0.01",
+                  "currency": "USDC",
+                  "network": "base",
+                  "pay_to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                  "note": "Pay $0.01 USDC on Base and retry with x402-Payment header"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/acp/decide": {
+      "servers": [{ "url": "https://decision-verification-agent.onrender.com" }],
+      "post": {
+        "tags": ["Decide"],
+        "summary": "ACP policy-driven decision",
+        "description": "Run a full policy-driven reasoning chain to determine the optimal action for an agent given a goal, asset, and risk policy. Returns a structured decision with supporting evidence and failure mode analysis. Cost: $0.01 USDC via x402 or Bearer / X-API-Key.",
+        "operationId": "acpDecide",
+        "security": [
+          { "bearerAuth": [] },
+          { "apiKeyHeader": [] },
+          { "x402Payment": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DecideRequest" },
+              "example": {
+                "action": "swap",
+                "goal": "maximize yield on idle USDC",
+                "asset": "USDC",
+                "chain": "base",
+                "policy": "conservative"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DecideResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "invalid_api_key" }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — x402 challenge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaymentRequired" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions/v1/api-key-signup": {
+      "servers": [{ "url": "https://dupfyqqbvkrmzjexwukd.supabase.co" }],
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Self-provision API key",
+        "description": "Issue a new `vp_` API key stored in the shared `api_signups` key store. Free tier — 100 requests/month, no credit card required. If the email already has a key the existing key is returned (`is_existing: true`). Keys are immediately valid on `/functions/v1/guard`.",
+        "operationId": "signupApiKey",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SignupRequest" },
+              "example": {
+                "full_name": "Ada Lovelace",
+                "email": "ada@example.com",
+                "company": "Acme Labs",
+                "use_case": "defi-agent",
+                "description": "Autonomous DeFi trading agent on Base"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API key issued (or existing key returned)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SignupResponse" },
+                "example": {
+                  "ok": true,
+                  "api_key": "vp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                  "plan": "free",
+                  "monthly_limit": 100,
+                  "is_existing": false,
+                  "message": "API key created successfully."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid fields",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "bad_request", "message": "full_name, email, and use_case are required." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/functions/v1/guard": {
+      "servers": [{ "url": "https://dupfyqqbvkrmzjexwukd.supabase.co" }],
+      "post": {
+        "tags": ["Private"],
+        "summary": "Key-authenticated pre-execution safety check",
+        "description": "Same guard logic as `/v1/acp/guard` but requires an API key from the shared `api_signups` store. Accept `Authorization: Bearer vp_xxx` or `X-API-Key: vp_xxx`. Keys issued by `/functions/v1/api-key-signup` are valid immediately. Cost: $0.01 deducted from monthly quota.",
+        "operationId": "privateGuard",
+        "security": [
+          { "bearerAuth": [] },
+          { "apiKeyHeader": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GuardRequest" },
+              "example": {
+                "action": "bridge",
+                "chain": "base",
+                "amount_usd": 50000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guard verdict issued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GuardResponse" },
+                "example": {
+                  "verdict": "proceed",
+                  "confidence": 0.95,
+                  "risk": "low",
+                  "expires_in": 300,
+                  "decision": {
+                    "action": "execute_bridge",
+                    "reason": "All safety checks passed.",
+                    "constraints": {}
+                  },
+                  "evidence": [
+                    { "type": "rpc", "status": 200, "latency_ms": 28, "ok": true },
+                    { "type": "stablecoin_depeg", "asset_id": "usd-coin", "price": 0.999762, "deviation_pct": 0.000238, "severity": "safe", "ok": true }
+                  ],
+                  "failure_modes": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "invalid_api_key" }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "bad_request", "message": "action (string) is required." }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key issued via POST /functions/v1/api-key-signup. Keys are prefixed `vp_`. Pass as: `Authorization: Bearer vp_xxx`"
+      },
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Alternative to Bearer. Pass your `vp_` key as: `X-API-Key: vp_xxx`"
+      },
+      "x402Payment": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x402-Payment",
+        "description": "x402 machine-payment proof. Pay $0.01 USDC on Base (chain_id 8453) to 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, then include the payment header on retry."
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "ok":   { "type": "boolean", "description": "true if the API is operational" },
+          "name": { "type": "string",  "description": "API name" }
+        }
+      },
+      "CapabilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "name":         { "type": "string" },
+          "version":      { "type": "string" },
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "checks":       { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "id":          { "type": "string" },
+          "name":        { "type": "string" },
+          "description": { "type": "string" },
+          "actions":     { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "SignupRequest": {
+        "type": "object",
+        "required": ["full_name", "email", "use_case"],
+        "properties": {
+          "full_name":   { "type": "string", "description": "Your name or agent name" },
+          "email":       { "type": "string", "format": "email", "description": "Email address — used to look up an existing key" },
+          "company":     { "type": "string", "description": "Company or project name (optional)" },
+          "use_case":    { "type": "string", "description": "Primary use case, e.g. defi-agent, bridge, portfolio" },
+          "description": { "type": "string", "description": "Brief description of what you are building (optional)" }
+        }
+      },
+      "SignupResponse": {
+        "type": "object",
+        "properties": {
+          "ok":            { "type": "boolean", "example": true },
+          "api_key":       { "type": "string",  "example": "vp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+          "plan":          { "type": "string",  "example": "free" },
+          "monthly_limit": { "type": "integer", "example": 100 },
+          "is_existing":   { "type": "boolean", "description": "true if a key already existed for this email" },
+          "message":       { "type": "string",  "example": "API key created successfully." }
+        }
+      },
+      "GuardRequest": {
+        "type": "object",
+        "required": ["action", "chain"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["swap", "transfer", "bridge", "yield_deposit", "stake", "generic"],
+            "description": "Agent action type"
+          },
+          "chain": {
+            "type": "string",
+            "enum": ["base", "ethereum", "arbitrum", "optimism"],
+            "description": "Target blockchain network"
+          },
+          "amount_usd": {
+            "type": "number",
+            "description": "USD value of the operation"
+          },
+          "asset": {
+            "type": "string",
+            "description": "Asset symbol (e.g. USDC, ETH, WBTC)"
+          },
+          "strict_mode": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, treat warnings as blocks"
+          }
+        }
+      },
+      "GuardResponse": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": ["proceed", "block", "warn"],
+            "description": "Safety verdict — gate your agent on this field"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Model confidence in the verdict"
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Overall risk level of the action"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds until this verdict expires — re-verify if agent stalls"
+          },
+          "decision": {
+            "type": "object",
+            "properties": {
+              "action":      { "type": "string" },
+              "reason":      { "type": "string" },
+              "constraints": { "type": "object" }
+            }
+          },
+          "evidence":      { "type": "array", "items": { "type": "object" } },
+          "failure_modes": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "DecideRequest": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string", "description": "Agent action type" },
+          "goal":   { "type": "string", "description": "Agent objective in plain language" },
+          "asset":  { "type": "string", "description": "Asset symbol" },
+          "chain":  { "type": "string", "description": "Target chain" },
+          "amount": { "type": "number", "description": "Amount in smallest unit" },
+          "policy": {
+            "type": "string",
+            "enum": ["conservative", "balanced", "aggressive"],
+            "description": "Risk policy — conservative halts on any medium risk"
+          }
+        }
+      },
+      "DecideResponse": {
+        "type": "object",
+        "properties": {
+          "verdict":       { "type": "string", "enum": ["proceed", "block", "wait"] },
+          "confidence":    { "type": "number" },
+          "risk":          { "type": "string" },
+          "expires_in":    { "type": "integer" },
+          "decision": {
+            "type": "object",
+            "properties": {
+              "action":      { "type": "string" },
+              "reason":      { "type": "string" },
+              "constraints": { "type": "object" }
+            }
+          },
+          "evidence":      { "type": "array", "items": { "type": "object" } },
+          "failure_modes": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "PaymentRequired": {
+        "type": "object",
+        "properties": {
+          "status":   { "type": "string",  "example": "payment_required" },
+          "code":     { "type": "integer", "example": 402 },
+          "price":    { "type": "string",  "example": "0.01", "description": "Amount in USDC" },
+          "currency": { "type": "string",  "example": "USDC" },
+          "network":  { "type": "string",  "example": "base" },
+          "pay_to":   { "type": "string",  "example": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+          "note":     { "type": "string" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error":   { "type": "string", "example": "invalid_api_key" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

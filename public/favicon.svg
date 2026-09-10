@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" shape-rendering="geometricPrecision">
+  <rect width="64" height="64" rx="13" fill="#050508"/>
+  <!-- V: left stroke -->
+  <line x1="9" y1="14" x2="22" y2="50" stroke="#578BFA" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- V: right stroke (shared with P stem) -->
+  <line x1="35" y1="14" x2="22" y2="50" stroke="#578BFA" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- P: stem (same x=35 top baseline) -->
+  <line x1="35" y1="14" x2="35" y2="50" stroke="#578BFA" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- P: top bowl -->
+  <path d="M35 14 Q57 14 57 26 Q57 38 35 38" stroke="#578BFA" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
